@@ -241,15 +241,15 @@ class Music {
     this.button = button;
     this.started = false;
 
-    // Browsers only allow sound to start after the player interacts with
-    // the page, so start on the first key press, click or tap. Safari on
-    // iPhone/iPad does not accept a touch's pointerdown for this, so also
-    // listen for the end of the tap (touchend/pointerup/click).
+    // Try to play right away. Most browsers block sound until the player
+    // clicks, taps or presses a key, so if that fails, start on the first
+    // interaction instead.
     const start = () => {
       if (this.started) return;
       this.started = true;
       this.audio.play().catch(() => { this.started = false; });
     };
+    start();
     for (const type of ["keydown", "pointerdown", "pointerup", "touchend", "click"]) {
       document.addEventListener(type, start);
     }

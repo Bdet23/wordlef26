@@ -226,6 +226,47 @@ class WordleApp {
   }
 }
 
+// ------------------------------------------------------------------ music
+
+const MUSIC_CLIPS = [
+  "audio/claw-ingame-part1.mp3",
+  "audio/claw-ingame-part2.mp3",
+];
+
+class Music {
+  constructor(button) {
+    const clip = MUSIC_CLIPS[Math.floor(Math.random() * MUSIC_CLIPS.length)];
+    this.audio = new Audio(clip);
+    this.audio.loop = true;
+    this.button = button;
+    this.started = false;
+
+    // Browsers only allow sound to start after the player interacts with
+    // the page, so start on the first key press or click.
+    const start = () => {
+      if (this.started) return;
+      this.started = true;
+      this.audio.play().catch(() => { this.started = false; });
+    };
+    document.addEventListener("keydown", start);
+    document.addEventListener("pointerdown", start);
+
+    button.addEventListener("click", (e) => {
+      e.currentTarget.blur();
+      this.audio.muted = !this.audio.muted;
+      this.updateButton();
+    });
+    this.updateButton();
+  }
+
+  updateButton() {
+    this.button.textContent = this.audio.muted ? "Music: off" : "Music: on";
+    this.button.setAttribute("aria-pressed", String(!this.audio.muted));
+  }
+}
+
+new Music(document.getElementById("music"));
+
 // ------------------------------------------------------------------ startup
 
 async function loadWords() {

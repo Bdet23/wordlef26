@@ -163,6 +163,7 @@ html, body {
   user-select: none;
 }
 .key.wide { width: var(--wide-w); font-size: 11px; }
+.key.used { background: var(--yellow); }
 .key.dead { background: var(--absent-key); color: #8a8a8a; }
 
 /* Medium screens: fewer boards per row so tiles stay readable */

@@ -330,10 +330,15 @@ class MultiApp {
       left + (left === 1 ? " guess" : " guesses") + " left";
     this.messageEl.textContent = this.message;
 
-    // Keyboard: darken letters that are ruled out on every unsolved board.
+    // Keyboard: letters already guessed are gold if they are still in some
+    // unsolved word, or dark if they are ruled out on every unsolved board.
     const dead = this.deadLetters();
+    const guessed = new Set(this.game.guesses.join(""));
     for (const [label, key] of Object.entries(this.keys)) {
-      key.classList.toggle("dead", dead.has(label.toLowerCase()));
+      const letter = label.toLowerCase();
+      const isDead = dead.has(letter);
+      key.classList.toggle("dead", isDead);
+      key.classList.toggle("used", !isDead && guessed.has(letter));
     }
   }
 }

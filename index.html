@@ -3,26 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fourdle</title>
+  <title>32dle</title>
   <!-- Bump ?v= when style.css or wordle.js changes, so browsers don't mix
        a new page with an old cached file. -->
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <main class="app">
-    <aside class="controls">
+    <header class="controls">
       <button id="new-game" type="button">New game</button>
       <button id="music" type="button">Music: on</button>
-      <p class="hint">Find all four words<br> in 9 guesses.<br> Each guess goes on<br> every board.</p>
-    </aside>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p class="hint">Find all 32 words in 37 guesses. Each guess goes on every board.</p>
+    </header>
 
-    <section class="game">
-      <div id="boards" class="boards" aria-label="Boards"></div>
+    <section id="boards" class="boards" aria-label="Boards"></section>
+
+    <footer class="bottom">
       <p id="message" class="message" role="status" aria-live="polite"></p>
       <div id="keyboard" class="keyboard" aria-label="Keyboard"></div>
-    </section>
+    </footer>
   </main>
 
-  <script src="wordle.js?v=4"></script>
+  <script src="wordle.js?v=5"></script>
 </body>
 </html>

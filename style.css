@@ -8,24 +8,24 @@
   --empty-line: #3a3a3c;
   --typed-line: #565758;
   --key-unused: #818384;
+  --miss: #b33a3a;
   --text: #ffffff;
   --hint: #a0a0a0;
   --button: #2c2c2e;
 
-  /* Tiles shrink so all four boards and the keyboard fit on screen */
-  --gap: 3px;
-  --board-gap: 14px;
-  --vh: 100vh;
-  --tile: clamp(16px, calc((var(--vh) - 310px) / 18), 34px);
-  --key-w: 30px;
-  --key-h: 40px;
-  --key-gap: 6px;
-  --wide-w: 52px;
-}
+  /* Boards per row; tiles shrink so that many boards fit across */
+  --cols: 8;
+  --gap: 2px;
+  --board-gap: 8px;
+  --page-w: min(100vw, 1232px);
+  /* each board adds 4 gaps + 2px padding + 2px border on each side */
+  --tile: calc((var(--page-w) - 32px - var(--cols) * (4 * var(--gap) + 8px)
+                - (var(--cols) - 1) * var(--board-gap)) / (5 * var(--cols)));
 
-/* Phones: use the visible height, not the height behind the browser bars */
-@supports (height: 100dvh) {
-  :root { --vh: 100dvh; }
+  --key-w: 40px;
+  --key-h: 48px;
+  --key-gap: 6px;
+  --wide-w: 66px;
 }
 
 * { box-sizing: border-box; }
@@ -37,23 +37,25 @@ html, body {
   font-family: Helvetica, Arial, sans-serif;
 }
 
+[hidden] { display: none !important; }
+
 .app {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px;
+  width: var(--page-w);
+  margin: 0 auto;
+  padding: 0 16px;
 }
 
-/* Side controls */
+/* Top bar */
 .controls {
-  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 0;
 }
 
 #new-game, #music {
-  display: block;
-  width: 120px;
-  margin: 10px 0 15px;
+  width: 110px;
   padding: 6px 0;
   background: var(--button);
   color: var(--text);
@@ -62,47 +64,53 @@ html, body {
   cursor: pointer;
 }
 #new-game:hover, #music:hover { background: #3a3a3c; }
-#music { margin-top: 0; }
+
+.status {
+  margin: 0;
+  font-weight: bold;
+}
 
 .hint {
-  margin: 0;
+  margin: 0 0 0 auto;
   color: var(--hint);
   font-size: 13px;
-  line-height: 1.4;
 }
 
-/* Game boards: 2x2 */
-.game {
-  width: 420px;
-  padding-top: 12px;
-}
-
+/* Boards */
 .boards {
   display: grid;
-  grid-template-columns: repeat(2, auto);
+  grid-template-columns: repeat(var(--cols), auto);
+  justify-content: space-between;
+  align-items: start;
   gap: var(--board-gap);
-  justify-content: center;
+  padding-bottom: 16px;
 }
 
 .board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  padding: 2px;
+  border: 2px solid transparent;
+  border-radius: 3px;
+}
+.board.solved { border-color: var(--green); opacity: 0.55; }
+.board.failed { border-color: var(--miss); }
+
+.row {
   display: grid;
   grid-template-columns: repeat(5, var(--tile));
   grid-auto-rows: var(--tile);
   gap: var(--gap);
-  padding: 4px;
-  border: 2px solid transparent;
-  border-radius: 4px;
 }
-.board.solved { border-color: var(--green); }
-.board.failed { border-color: #b33a3a; }
 
 .tile {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--empty-line);
+  border: 1px solid var(--empty-line);
   background: var(--empty-fill);
-  font-size: calc(var(--tile) * 0.55);
+  font-size: calc(var(--tile) * 0.6);
   font-weight: bold;
   text-transform: uppercase;
   user-select: none;
@@ -111,16 +119,25 @@ html, body {
 .tile.G { background: var(--green); border-color: var(--green); }
 .tile.Y { background: var(--yellow); border-color: var(--yellow); }
 .tile.gray { background: var(--gray); border-color: var(--gray); }
+.tile.miss { background: var(--miss); border-color: var(--miss); }
+
+/* Message and keyboard stay pinned to the bottom while the boards scroll */
+.bottom {
+  position: sticky;
+  bottom: 0;
+  background: var(--empty-fill);
+  border-top: 1px solid var(--empty-line);
+  padding: 4px 0 10px;
+}
 
 .message {
-  height: 24px;
-  margin: 10px 0;
+  height: 22px;
+  margin: 4px 0 6px;
   text-align: center;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: bold;
 }
 
-/* On-screen keyboard */
 .keyboard {
   display: flex;
   flex-direction: column;
@@ -138,55 +155,36 @@ html, body {
   height: var(--key-h);
   padding: 0;
   border: none;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--key-unused);
   color: var(--text);
   font: bold 15px Helvetica, Arial, sans-serif;
   cursor: pointer;
   user-select: none;
-  position: relative;
-  overflow: hidden;
 }
 .key.wide { width: var(--wide-w); font-size: 11px; }
-.key .label { position: relative; }
+.key.dead { background: var(--absent-key); color: #8a8a8a; }
 
-/* Each letter key is split into four quarters, one per board */
-.quads {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template: 1fr 1fr / 1fr 1fr;
+/* Medium screens: fewer boards per row so tiles stay readable */
+@media (max-width: 900px) {
+  :root { --cols: 4; --board-gap: 10px; }
+  .hint { margin-left: 0; width: 100%; }
 }
-.key.used .quads i { background: var(--absent-key); }
-.key .quads i.G { background: var(--green); }
-.key .quads i.Y { background: var(--yellow); }
-.key .quads i.gray { background: var(--absent-key); }
-/* A quarter with no info yet stays the plain key color */
-.key.used .quads i:not(.G):not(.Y):not(.gray) { background: var(--key-unused); }
 
-/* Phones: stack the controls above the board and shrink to fit */
+/* Phones */
 @media (max-width: 560px) {
   :root {
-    --board-gap: 8px;
-    --tile: clamp(14px, min(calc((100vw - 80px) / 10), calc((var(--vh) - 342px) / 18)), 34px);
+    --board-gap: 6px;
     --key-w: calc((100vw - 32px - 9 * var(--key-gap)) / 10);
     --wide-w: calc(var(--key-w) * 1.6);
     --key-h: 46px;
   }
-  .app { flex-direction: column; align-items: center; padding: 8px 16px; }
-  .controls { display: flex; align-items: center; gap: 16px; padding: 0; }
-  .controls { flex-wrap: wrap; justify-content: center; gap: 8px 12px; }
-  #new-game, #music { margin: 0; width: 110px; }
-  .hint { display: none; }
-  .message { margin: 10px 0; }
-  .game { width: 100%; padding-top: 10px; }
-  .board { padding: 2px; }
+  .controls { justify-content: center; }
+  .status, .hint { width: 100%; text-align: center; }
+  .tile { border-width: 1px; }
 }
 
-/* Short phones (e.g. iPhone SE): smaller tiles and keys so it all fits */
-@media (max-width: 560px) and (max-height: 640px) {
-  :root {
-    --key-h: 40px;
-    --tile: clamp(13px, min(calc((100vw - 80px) / 10), calc((var(--vh) - 324px) / 18)), 34px);
-  }
+/* Very narrow phones (e.g. iPhone SE): 3 boards per row */
+@media (max-width: 360px) {
+  :root { --cols: 3; }
 }

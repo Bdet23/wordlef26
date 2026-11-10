@@ -1,13 +1,16 @@
-// Wordle for the web, ported from wordle_tkinter.py.
+// Fourdle for the web: guess four words at once.
+// Every guess is played on all four boards. A board stops taking guesses once
+// its word is found. Solve all four within MAX_GUESSES to win.
 // Loads words.txt from the same directory as this page.
 
 "use strict";
 
 // ------------------------------------------------------------------ engine
-// (same rules and scoring as the Python version)
+// (same scoring as the Python Wordle)
 
 const WORD_LENGTH = 5;
-const MAX_GUESSES = 6;
+const NUM_BOARDS = 4;
+const MAX_GUESSES = 9;
 const STRICT_WORDS = true; // Reject guesses that are not in WORDS
 
 const GREEN = "G";
@@ -38,15 +41,33 @@ function scoreGuess(guess, target) {
   return result.join("");
 }
 
-class WordleGame {
-  constructor(target) {
-    this.target = target || WORDS[Math.floor(Math.random() * WORDS.length)];
-    this.history = []; // list of [guess, score]
-    this.won = false;
+/** Pick NUM_BOARDS different random words. */
+function pickTargets() {
+  const picked = new Set();
+  while (picked.size < NUM_BOARDS) {
+    picked.add(WORDS[Math.floor(Math.random() * WORDS.length)]);
+  }
+  return [...picked];
+}
+
+class FourdleGame {
+  constructor(targets) {
+    this.targets = targets || pickTargets();
+    this.guesses = [];
+    // Index of the guess that solved each board, or -1 if not solved yet.
+    this.solvedAt = new Array(NUM_BOARDS).fill(-1);
+  }
+
+  solved(board) {
+    return this.solvedAt[board] !== -1;
+  }
+
+  won() {
+    return this.solvedAt.every((i) => i !== -1);
   }
 
   over() {
-    return this.won || this.history.length >= MAX_GUESSES;
+    return this.won() || this.guesses.length >= MAX_GUESSES;
   }
 
   validate(guess) {
@@ -61,10 +82,21 @@ class WordleGame {
   guess(guess) {
     const error = this.validate(guess);
     if (error) return error;
-    const score = scoreGuess(guess, this.target);
-    this.history.push([guess, score]);
-    if (score === GREEN.repeat(WORD_LENGTH)) this.won = true;
+    this.guesses.push(guess);
+    for (let b = 0; b < NUM_BOARDS; b++) {
+      if (!this.solved(b) && guess === this.targets[b]) {
+        this.solvedAt[b] = this.guesses.length - 1;
+      }
+    }
     return null;
+  }
+
+  /** List of [guess, score] rows shown on one board. */
+  boardHistory(board) {
+    const rows = this.solved(board)
+      ? this.guesses.slice(0, this.solvedAt[board] + 1)
+      : this.guesses;
+    return rows.map((word) => [word, scoreGuess(word, this.targets[board])]);
   }
 }
 
@@ -78,14 +110,16 @@ const KEY_ROWS = [
 
 // CSS class for each score letter ("." is not a valid class name)
 const SCORE_CLASS = { [GREEN]: "G", [YELLOW]: "Y", [GRAY]: "gray" };
+const RANK = { [GREEN]: 3, [YELLOW]: 2, [GRAY]: 1 };
+const RANK_CLASS = { 3: "G", 2: "Y", 1: "gray" };
 
-class WordleApp {
+class FourdleApp {
   constructor() {
-    this.gridEl = document.getElementById("grid");
+    this.boardsEl = document.getElementById("boards");
     this.messageEl = document.getElementById("message");
     this.keyboardEl = document.getElementById("keyboard");
 
-    this.tiles = this.buildGrid();
+    this.boards = this.buildBoards();
     this.keys = this.buildKeyboard();
 
     document.getElementById("new-game").addEventListener("click", (e) => {
@@ -97,19 +131,27 @@ class WordleApp {
     this.newGame();
   }
 
-  buildGrid() {
-    const tiles = [];
-    for (let row = 0; row < MAX_GUESSES; row++) {
-      const rowTiles = [];
-      for (let col = 0; col < WORD_LENGTH; col++) {
-        const tile = document.createElement("div");
-        tile.className = "tile";
-        this.gridEl.appendChild(tile);
-        rowTiles.push(tile);
+  buildBoards() {
+    const boards = [];
+    for (let b = 0; b < NUM_BOARDS; b++) {
+      const boardEl = document.createElement("div");
+      boardEl.className = "board";
+      boardEl.setAttribute("aria-label", "Board " + (b + 1));
+      const tiles = [];
+      for (let row = 0; row < MAX_GUESSES; row++) {
+        const rowTiles = [];
+        for (let col = 0; col < WORD_LENGTH; col++) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          boardEl.appendChild(tile);
+          rowTiles.push(tile);
+        }
+        tiles.push(rowTiles);
       }
-      tiles.push(rowTiles);
+      this.boardsEl.appendChild(boardEl);
+      boards.push({ el: boardEl, tiles });
     }
-    return tiles;
+    return boards;
   }
 
   buildKeyboard() {
@@ -121,13 +163,28 @@ class WordleApp {
         const key = document.createElement("button");
         key.type = "button";
         key.className = label.length > 1 ? "key wide" : "key";
-        key.textContent = label;
+        const quads = [];
+        if (label.length === 1) {
+          // One colored quarter per board, laid out like the boards (2x2).
+          const quadsEl = document.createElement("span");
+          quadsEl.className = "quads";
+          for (let b = 0; b < NUM_BOARDS; b++) {
+            const quad = document.createElement("i");
+            quadsEl.appendChild(quad);
+            quads.push(quad);
+          }
+          key.appendChild(quadsEl);
+        }
+        const text = document.createElement("span");
+        text.className = "label";
+        text.textContent = label;
+        key.appendChild(text);
         key.addEventListener("click", (e) => {
           e.currentTarget.blur();
           this.press(label);
         });
         rowEl.appendChild(key);
-        keys[label] = key;
+        keys[label] = { el: key, quads };
       }
       this.keyboardEl.appendChild(rowEl);
     }
@@ -135,21 +192,25 @@ class WordleApp {
   }
 
   newGame() {
-    this.game = new WordleGame();
+    this.game = new FourdleGame();
     this.current = "";
     this.message = "";
     this.draw();
   }
 
+  /** For each board, map letter -> best rank seen on that board. */
   letterStatus() {
-    const rank = { [GREEN]: 3, [YELLOW]: 2, [GRAY]: 1 };
-    const status = {};
-    for (const [word, score] of this.game.history) {
-      for (let i = 0; i < WORD_LENGTH; i++) {
-        status[word[i]] = Math.max(status[word[i]] || 0, rank[score[i]]);
+    const perBoard = [];
+    for (let b = 0; b < NUM_BOARDS; b++) {
+      const status = {};
+      for (const [word, score] of this.game.boardHistory(b)) {
+        for (let i = 0; i < WORD_LENGTH; i++) {
+          status[word[i]] = Math.max(status[word[i]] || 0, RANK[score[i]]);
+        }
       }
+      perBoard.push(status);
     }
-    return status;
+    return perBoard;
   }
 
   press(label) {
@@ -163,12 +224,17 @@ class WordleApp {
         this.message = error;
       } else {
         this.current = "";
-        if (this.game.won) {
-          this.message = "Solved in " + this.game.history.length + "!";
+        const n = this.game.guesses.length;
+        if (this.game.won()) {
+          this.message = "Solved all four in " + n + "!";
         } else if (this.game.over()) {
-          this.message = "The word was " + this.game.target.toUpperCase();
+          const missed = this.game.targets
+            .filter((_, b) => !this.game.solved(b))
+            .map((w) => w.toUpperCase());
+          this.message = "Missed: " + missed.join(", ");
         } else {
-          this.message = "";
+          const left = MAX_GUESSES - n;
+          this.message = left + (left === 1 ? " guess left" : " guesses left");
         }
       }
     } else if (this.current.length < WORD_LENGTH) {
@@ -192,22 +258,30 @@ class WordleApp {
   }
 
   draw() {
-    const history = this.game.history;
+    const over = this.game.over();
 
-    // Grid
-    for (let row = 0; row < MAX_GUESSES; row++) {
-      for (let col = 0; col < WORD_LENGTH; col++) {
-        const tile = this.tiles[row][col];
-        if (row < history.length) {
-          const [word, score] = history[row];
-          tile.className = "tile " + SCORE_CLASS[score[col]];
-          tile.textContent = word[col];
-        } else if (row === history.length && col < this.current.length) {
-          tile.className = "tile typed";
-          tile.textContent = this.current[col];
-        } else {
-          tile.className = "tile";
-          tile.textContent = "";
+    // Boards
+    for (let b = 0; b < NUM_BOARDS; b++) {
+      const { el, tiles } = this.boards[b];
+      const history = this.game.boardHistory(b);
+      const solved = this.game.solved(b);
+      el.classList.toggle("solved", solved);
+      el.classList.toggle("failed", over && !solved);
+      for (let row = 0; row < MAX_GUESSES; row++) {
+        for (let col = 0; col < WORD_LENGTH; col++) {
+          const tile = tiles[row][col];
+          if (row < history.length) {
+            const [word, score] = history[row];
+            tile.className = "tile " + SCORE_CLASS[score[col]];
+            tile.textContent = word[col];
+          } else if (!solved && !over && row === history.length &&
+                     col < this.current.length) {
+            tile.className = "tile typed";
+            tile.textContent = this.current[col];
+          } else {
+            tile.className = "tile";
+            tile.textContent = "";
+          }
         }
       }
     }
@@ -215,13 +289,19 @@ class WordleApp {
     // Status message
     this.messageEl.textContent = this.message;
 
-    // Keyboard tracker
+    // Keyboard tracker: each key shows one quarter per board.
+    // Solved boards no longer matter, so their quarter goes back to plain.
     const status = this.letterStatus();
-    const rankClass = { 3: "G", 2: "Y", 1: "gray" };
-    for (const [label, key] of Object.entries(this.keys)) {
-      const base = label.length > 1 ? "key wide" : "key";
-      const cls = rankClass[status[label.toLowerCase()]];
-      key.className = cls ? base + " " + cls : base;
+    for (const [label, { el, quads }] of Object.entries(this.keys)) {
+      if (!quads.length) continue;
+      const letter = label.toLowerCase();
+      let used = false;
+      quads.forEach((quad, b) => {
+        const cls = this.game.solved(b) ? "" : RANK_CLASS[status[b][letter]] || "";
+        quad.className = cls;
+        if (cls) used = true;
+      });
+      el.classList.toggle("used", used);
     }
   }
 }
@@ -286,7 +366,7 @@ loadWords()
   .then((words) => {
     WORDS = words;
     WORD_SET = new Set(words);
-    new WordleApp();
+    new FourdleApp();
   })
   .catch((err) => {
     document.getElementById("message").textContent =

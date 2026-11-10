@@ -12,12 +12,20 @@
   --hint: #a0a0a0;
   --button: #2c2c2e;
 
-  --tile: 56px;
-  --gap: 8px;
+  /* Tiles shrink so all four boards and the keyboard fit on screen */
+  --gap: 3px;
+  --board-gap: 14px;
+  --vh: 100vh;
+  --tile: clamp(16px, calc((var(--vh) - 310px) / 18), 34px);
   --key-w: 30px;
   --key-h: 40px;
   --key-gap: 6px;
   --wide-w: 52px;
+}
+
+/* Phones: use the visible height, not the height behind the browser bars */
+@supports (height: 100dvh) {
+  :root { --vh: 100dvh; }
 }
 
 * { box-sizing: border-box; }
@@ -63,19 +71,30 @@ html, body {
   line-height: 1.4;
 }
 
-/* Game board */
+/* Game boards: 2x2 */
 .game {
-  width: 400px;
-  padding-top: 20px;
+  width: 420px;
+  padding-top: 12px;
 }
 
-.grid {
+.boards {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: var(--board-gap);
+  justify-content: center;
+}
+
+.board {
   display: grid;
   grid-template-columns: repeat(5, var(--tile));
   grid-auto-rows: var(--tile);
   gap: var(--gap);
-  justify-content: center;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 4px;
 }
+.board.solved { border-color: var(--green); }
+.board.failed { border-color: #b33a3a; }
 
 .tile {
   display: flex;
@@ -83,7 +102,7 @@ html, body {
   justify-content: center;
   border: 2px solid var(--empty-line);
   background: var(--empty-fill);
-  font-size: 24px;
+  font-size: calc(var(--tile) * 0.55);
   font-weight: bold;
   text-transform: uppercase;
   user-select: none;
@@ -95,8 +114,8 @@ html, body {
 
 .message {
   height: 24px;
-  margin: 16px 0;
-  padding-left: calc((400px - (5 * var(--tile) + 4 * var(--gap))) / 2);
+  margin: 10px 0;
+  text-align: center;
   font-size: 18px;
   font-weight: bold;
 }
@@ -125,34 +144,49 @@ html, body {
   font: bold 15px Helvetica, Arial, sans-serif;
   cursor: pointer;
   user-select: none;
+  position: relative;
+  overflow: hidden;
 }
 .key.wide { width: var(--wide-w); font-size: 11px; }
-.key.G { background: var(--green); }
-.key.Y { background: var(--yellow); }
-.key.gray { background: var(--absent-key); }
+.key .label { position: relative; }
+
+/* Each letter key is split into four quarters, one per board */
+.quads {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: 1fr 1fr / 1fr 1fr;
+}
+.key.used .quads i { background: var(--absent-key); }
+.key .quads i.G { background: var(--green); }
+.key .quads i.Y { background: var(--yellow); }
+.key .quads i.gray { background: var(--absent-key); }
+/* A quarter with no info yet stays the plain key color */
+.key.used .quads i:not(.G):not(.Y):not(.gray) { background: var(--key-unused); }
 
 /* Phones: stack the controls above the board and shrink to fit */
 @media (max-width: 560px) {
   :root {
-    --tile: 52px;
-    --gap: 6px;
+    --board-gap: 8px;
+    --tile: clamp(14px, min(calc((100vw - 80px) / 10), calc((var(--vh) - 342px) / 18)), 34px);
     --key-w: calc((100vw - 32px - 9 * var(--key-gap)) / 10);
     --wide-w: calc(var(--key-w) * 1.6);
-    --key-h: 52px;
+    --key-h: 46px;
   }
   .app { flex-direction: column; align-items: center; padding: 8px 16px; }
   .controls { display: flex; align-items: center; gap: 16px; padding: 0; }
   .controls { flex-wrap: wrap; justify-content: center; gap: 8px 12px; }
   #new-game, #music { margin: 0; width: 110px; }
-  .hint { width: 100%; text-align: center; }
-  .hint br { display: none; }
+  .hint { display: none; }
   .message { margin: 10px 0; }
   .game { width: 100%; padding-top: 10px; }
-  .message { padding-left: 0; text-align: center; }
+  .board { padding: 2px; }
 }
 
 /* Short phones (e.g. iPhone SE): smaller tiles and keys so it all fits */
 @media (max-width: 560px) and (max-height: 640px) {
-  :root { --tile: 42px; --key-h: 44px; }
-  .tile { font-size: 20px; }
+  :root {
+    --key-h: 40px;
+    --tile: clamp(13px, min(calc((100vw - 80px) / 10), calc((var(--vh) - 324px) / 18)), 34px);
+  }
 }

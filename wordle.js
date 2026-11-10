@@ -114,8 +114,32 @@ const SCORE_CLASS = { [GREEN]: "G", [YELLOW]: "Y", [GRAY]: "gray" };
 class MultiApp {
   constructor() {
     this.boardsEl = document.getElementById("boards");
+    if (!this.boardsEl) {
+      // Original Wordle page: swap its single grid for the boards container.
+      this.boardsEl = document.createElement("section");
+      this.boardsEl.id = "boards";
+      this.boardsEl.className = "boards";
+      const grid = document.getElementById("grid");
+      if (grid) grid.replaceWith(this.boardsEl);
+      else document.querySelector(".app").prepend(this.boardsEl);
+    }
     this.messageEl = document.getElementById("message");
+    // The page may be an older cached copy without these elements (browsers
+    // can keep index.html for a few minutes after an update), so create
+    // anything that is missing instead of crashing.
     this.statusEl = document.getElementById("status");
+    if (!this.statusEl) {
+      this.statusEl = document.createElement("p");
+      this.statusEl.id = "status";
+      this.statusEl.className = "status";
+      document.querySelector(".controls").appendChild(this.statusEl);
+    }
+    const hint = document.querySelector(".hint");
+    if (hint) {
+      hint.textContent = "Find all " + NUM_BOARDS + " words in " + MAX_GUESSES +
+        " guesses. Each guess goes on every board.";
+    }
+    document.title = NUM_BOARDS + "dle";
     this.keyboardEl = document.getElementById("keyboard");
 
     this.boards = this.buildBoards();
@@ -370,13 +394,21 @@ async function loadWords() {
     .filter((line) => line.length > 0);
 }
 
+function showError(text) {
+  const el = document.getElementById("message");
+  if (el) el.textContent = text;
+}
+
 loadWords()
   .then((words) => {
     WORDS = words;
     WORD_SET = new Set(words);
-    new MultiApp();
-  })
-  .catch((err) => {
-    document.getElementById("message").textContent =
-      "Could not load words.txt (" + err.message + ")";
+    try {
+      new MultiApp();
+    } catch (err) {
+      showError("Could not start the game (" + err.message + "). Try reloading the page.");
+      throw err;
+    }
+  }, (err) => {
+    showError("Could not load words.txt (" + err.message + ")");
   });
